@@ -1,0 +1,40 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Dynamic.puml
+
+LAYOUT_LEFT_RIGHT()
+
+title Тёплый дом — сценарий «если ниже 18 °C, включить отопление» (динамическая диаграмма, To-Be)
+
+System_Ext(sensor, "Датчик температуры", "Через хаб партнёра")
+System_Ext(boiler, "Котёл", "Реле через хаб партнёра")
+Person(user, "Пользователь", "Житель дома")
+System_Ext(push, "Push-сервисы", "Apple APNs, Google FCM")
+
+System_Boundary(warmhouse, "Тёплый дом") {
+  ContainerQueue(mqtt, "MQTT-брокер", "MQTT", "Связь с хабами")
+  Container(types, "Типы и протоколы", "Сервис-шлюз", "Переводит протокол во внутренние события")
+  ContainerQueue(kafka, "Kafka", "Kafka", "События между сервисами")
+  Container(telemetry, "Телеметрия", "Сервис", "История показаний")
+  Container(executor, "Исполнение сценариев", "Сервис", "Проверяет триггеры")
+  Container(heating, "Отопление", "Сервис", "Команды и состояние")
+  Container(notifications, "Уведомления", "Сервис", "Доставка сообщений")
+}
+
+Rel(sensor, mqtt, "Публикует показание 17,5 °C", "MQTT")
+Rel(mqtt, types, "Доставляет сообщение хаба", "MQTT")
+Rel(types, kafka, "Публикует событие «показание получено»")
+Rel(kafka, telemetry, "Доставляет показание для истории")
+Rel(kafka, executor, "Доставляет показание, срабатывает триггер «ниже 18 °C»")
+Rel(executor, kafka, "Публикует команду «включить отопление»")
+Rel(kafka, heating, "Доставляет команду")
+Rel(heating, kafka, "Публикует команду для устройства")
+Rel(kafka, types, "Доставляет команду для устройства")
+Rel(types, mqtt, "Отправляет команду в протоколе устройства", "MQTT")
+Rel(mqtt, boiler, "Включает котёл", "MQTT")
+Rel(executor, kafka, "Публикует запрос уведомления")
+Rel(kafka, notifications, "Доставляет запрос уведомления")
+Rel(notifications, push, "Отправляет push «Отопление включено»", "HTTPS")
+Rel(push, user, "Показывает уведомление")
+
+SHOW_LEGEND()
+@enduml

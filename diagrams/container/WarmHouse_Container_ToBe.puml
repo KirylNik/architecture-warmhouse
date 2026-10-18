@@ -1,0 +1,108 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+skinparam nodesep 60
+skinparam ranksep 90
+
+title Тёплый дом — диаграмма контейнеров (To-Be)
+
+Person(user, "Пользователь", "Житель дома")
+Person(support, "Сотрудник поддержки", "Сотрудник компании")
+
+System_Ext(idp, "Яндекс ID, Google", "Внешний вход")
+System_Ext(hub, "Хабы и устройства партнёров", "Датчики, реле, камеры, замки в доме")
+System_Ext(push, "Push-сервисы", "Apple APNs, Google FCM")
+System_Ext(mail, "Почтовый сервис", "Отправка писем")
+
+System_Boundary(warmhouse, "Тёплый дом") {
+  Container(mobile, "Мобильное приложение", "iOS, Android", "Приложение пользователя")
+  Container(admin, "Веб-приложение поддержки", "SPA", "Рабочее место сотрудника поддержки")
+  Container(gateway, "API-шлюз", "Kong", "Единая точка входа, проверка токенов")
+
+  Boundary(automation, "Автоматизация") {
+    Container(constructor, "Конструктор сценариев", "Сервис", "Описание сценариев")
+    Container(executor, "Исполнение сценариев", "Сервис", "Срабатывание, история запусков")
+  }
+
+  Boundary(devicesDomain, "Управление устройствами") {
+    Container(devices, "Устройства дома", "Сервис", "Экземпляры устройств, подключение")
+    Container(types, "Типы и протоколы", "Сервис-шлюз", "Каталог типов, адаптеры протоколов")
+    Boundary(commands, "Команды и состояние") {
+      Container(heating, "Отопление", "Сервис", "Команды и состояние")
+      Container(lighting, "Освещение", "Сервис", "Команды и состояние")
+      Container(gates, "Ворота", "Сервис", "Команды и состояние")
+      Container(sensors, "Датчики", "Сервис", "Состояние датчиков")
+    }
+  }
+
+  Boundary(monitoring, "Мониторинг дома") {
+    Container(telemetry, "Телеметрия", "Сервис", "Показания и история")
+    Container(video, "Видеонаблюдение", "Сервис", "Живой просмотр и архив")
+    Container(notifications, "Уведомления", "Сервис", "Доставка сообщений")
+  }
+
+  Boundary(access, "Дома и доступ") {
+    Container(homes, "Управление домами", "Сервис", "Дома, комнаты, участники, права")
+    Container(accounts, "Управление аккаунтами", "Сервис", "Профиль, контакты")
+    Container(keycloak, "Keycloak", "Keycloak", "Вход, токены")
+  }
+
+  ContainerQueue(kafka, "Kafka", "Kafka", "События между сервисами")
+  ContainerQueue(mqtt, "MQTT-брокер", "MQTT", "Связь с хабами")
+  ContainerDb(postgres, "PostgreSQL", "PostgreSQL", "Отдельная схема на каждый сервис")
+  ContainerDb(clickhouse, "ClickHouse", "ClickHouse", "Показания датчиков")
+  ContainerDb(s3, "Объектное хранилище", "S3", "Видеозаписи")
+}
+
+Lay_R(user, support)
+Lay_R(mobile, admin)
+Lay_R(executor, devices)
+Lay_R(types, telemetry)
+Lay_R(notifications, homes)
+Lay_D(types, mqtt)
+Lay_R(mqtt, kafka)
+Lay_R(kafka, clickhouse)
+Lay_R(clickhouse, s3)
+Lay_R(s3, postgres)
+Lay_L(mqtt, hub)
+Lay_R(keycloak, idp)
+Lay_R(notifications, push)
+
+Rel_D(user, mobile, "Пользуется")
+Rel_D(support, admin, "Пользуется")
+Rel_D(mobile, gateway, "Вызывает API", "HTTPS, REST")
+Rel_D(admin, gateway, "Вызывает API", "HTTPS, REST")
+Rel(mobile, keycloak, "Входит", "OIDC")
+Rel(admin, keycloak, "Входит", "OIDC")
+Rel(mobile, video, "Смотрит видео", "WebRTC")
+
+Rel_D(gateway, automation, "Маршрутизирует запросы", "REST")
+Rel_D(gateway, devicesDomain, "Маршрутизирует запросы", "REST")
+Rel_D(gateway, monitoring, "Маршрутизирует запросы", "REST")
+Rel_D(gateway, access, "Маршрутизирует запросы", "REST")
+
+Rel_R(automation, devicesDomain, "Запрашивает устройства и возможности типов", "REST")
+Rel_L(monitoring, devicesDomain, "Запрашивает устройства, открывает видеопоток", "REST")
+Rel(devices, homes, "Проверяет дом и комнату", "REST")
+Rel_D(devices, types, "Сопрягает устройство", "REST")
+Rel_U(commands, devices, "Запрашивает устройство", "REST")
+Rel(notifications, accounts, "Запрашивает контакты", "REST")
+Rel_D(homes, accounts, "Запрашивает пользователей", "REST")
+Rel_D(accounts, keycloak, "Управляет пользователями", "Admin API")
+Rel_R(keycloak, idp, "Вход через", "OAuth 2.0")
+
+Rel_D(types, mqtt, "Обменивается сообщениями с хабами", "MQTT")
+Rel_R(hub, mqtt, "Обменивается сообщениями", "MQTT")
+
+Rel_D(devicesDomain, kafka, "Публикует показания, состояние, команды")
+Rel_D(automation, kafka, "Публикует команды и изменения сценариев")
+Rel_D(access, kafka, "Публикует приглашения и отзыв доступа")
+Rel_U(kafka, monitoring, "Доставляет показания и запросы уведомлений")
+
+Rel_D(telemetry, clickhouse, "Пишет и читает")
+Rel_D(video, s3, "Пишет и читает записи")
+Rel_R(notifications, push, "Отправляет push", "HTTPS")
+Rel_R(notifications, mail, "Отправляет письма", "SMTP")
+
+SHOW_LEGEND()
+@enduml
