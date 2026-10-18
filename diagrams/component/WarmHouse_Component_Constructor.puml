@@ -1,0 +1,40 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Конструктор сценариев — диаграмма компонентов
+
+Container(gateway, "API-шлюз", "Kong", "Единая точка входа")
+Container(devices, "Устройства дома", "TypeScript", "Экземпляры устройств")
+Container(types, "Типы и протоколы", "TypeScript", "Каталог типов и возможностей")
+ContainerDb(postgres, "PostgreSQL", "PostgreSQL, JSONB", "Схема scenarios")
+ContainerQueue(kafka, "Kafka", "Kafka", "События между сервисами")
+
+Container_Boundary(constructor, "Конструктор сценариев") {
+  Component(controller, "REST-контроллер", "TypeScript, REST", "Создание, изменение, включение и выключение сценариев")
+  Component(scenarioService, "Сервис сценариев", "TypeScript", "Жизненный цикл сценария")
+  Component(validator, "Проверка сценариев", "TypeScript", "Соответствие возможностям типов, устройства дома, права автора")
+  Component(devicesClient, "Клиент устройств", "TypeScript, REST", "Устройства дома пользователя")
+  Component(typesClient, "Клиент типов и протоколов", "TypeScript, REST", "Возможности типов: триггеры и действия")
+  Component(repository, "Репозиторий", "TypeScript", "Работа со схемой scenarios")
+  Component(consumer, "Консьюмер событий", "TypeScript, Kafka", "Получает «устройство удалено» и «перенесено»")
+  Component(producer, "Продюсер событий", "TypeScript, Kafka", "Публикует изменения сценариев и запросы уведомлений")
+}
+
+Rel(gateway, controller, "Передаёт запросы пользователя", "REST")
+
+Rel(controller, scenarioService, "Вызывает")
+Rel(consumer, scenarioService, "Отключает сценарии с удалённым устройством")
+Rel(scenarioService, validator, "Проверяет сценарий")
+Rel(validator, devicesClient, "Проверяет устройства дома")
+Rel(validator, typesClient, "Проверяет возможности типов")
+Rel(scenarioService, repository, "Читает и пишет сценарии")
+Rel(scenarioService, producer, "Передаёт изменения сценариев")
+
+Rel(devicesClient, devices, "Запрашивает устройства дома", "REST")
+Rel(typesClient, types, "Запрашивает возможности типов", "REST")
+Rel(repository, postgres, "Читает и пишет", "SQL")
+Rel(kafka, consumer, "Доставляет изменения устройств")
+Rel(producer, kafka, "Публикует «сценарий создан, изменён, удалён», запросы уведомлений")
+
+SHOW_LEGEND()
+@enduml

@@ -64,7 +64,7 @@
 | Конструктор сценариев | Устройства дома, Типы и протоколы |
 | Исполнение сценариев | Конструктор сценариев, Команды и состояние, Устройства дома, Типы и протоколы, Уведомления |
 | Телеметрия | Типы и протоколы, Устройства дома |
-| Живой просмотр | Типы и протоколы, Устройства дома, Уведомления |
+| Живой просмотр | Типы и протоколы, Устройства дома |
 | Архив записей | Живой просмотр, Устройства дома |
 | Уведомления | Управление аккаунтами |
 
@@ -111,7 +111,6 @@ flowchart BT
   TEL --> DEV
   LIV --> TYP
   LIV --> DEV
-  LIV --> NOT
   ARC --> LIV
   ARC --> DEV
   NOT --> ACC
@@ -138,8 +137,6 @@ flowchart BT
 
 ![Диаграмма контекста As-Is](diagrams/context/WarmHouse_Context_AsIs.png)
 
-Исходник: [WarmHouse_Context_AsIs.puml](diagrams/context/WarmHouse_Context_AsIs.puml)
-
 # Задание 2. Проектирование микросервисной архитектуры
 
 В этом задании вам нужно предоставить только диаграммы в модели C4. Мы не просим вас отдельно описывать получившиеся микросервисы и то, как вы определили взаимодействия между компонентами To-Be системы. Если вы правильно подготовите диаграммы C4, они и так это покажут.
@@ -148,19 +145,53 @@ flowchart BT
 
 ![Диаграмма контейнеров To-Be](diagrams/container/WarmHouse_Container_ToBe.png)
 
-Исходник: [WarmHouse_Container_ToBe.puml](diagrams/container/WarmHouse_Container_ToBe.puml)
-
-Связи через Kafka и общие запросы показаны на уровне доменов, подробные связи между сервисами — в таблице «Связи между контекстами» в задании 1.
+Связи показаны на уровне доменов, подробные — в таблице связей в задании 1.
 
 **Динамическая диаграмма: сценарий «если ниже 18 °C, включить отопление»**
 
 ![Динамическая диаграмма сценария отопления](diagrams/dynamic/WarmHouse_Dynamic_Heating.png)
 
-Исходник: [WarmHouse_Dynamic_Heating.puml](diagrams/dynamic/WarmHouse_Dynamic_Heating.puml)
-
 **Диаграмма компонентов (Components)**
 
-Добавьте диаграмму для каждого из выделенных микросервисов.
+#### Управление аккаунтами
+
+![Компоненты: Управление аккаунтами](diagrams/component/WarmHouse_Component_Accounts.png)
+
+#### Управление домами
+
+![Компоненты: Управление домами](diagrams/component/WarmHouse_Component_Homes.png)
+
+#### Типы и протоколы
+
+![Компоненты: Типы и протоколы](diagrams/component/WarmHouse_Component_Types.png)
+
+#### Устройства дома
+
+![Компоненты: Устройства дома](diagrams/component/WarmHouse_Component_Devices.png)
+
+#### Отопление (шаблон для освещения, ворот и датчиков)
+
+![Компоненты: Отопление](diagrams/component/WarmHouse_Component_Heating.png)
+
+#### Конструктор сценариев
+
+![Компоненты: Конструктор сценариев](diagrams/component/WarmHouse_Component_Constructor.png)
+
+#### Исполнение сценариев
+
+![Компоненты: Исполнение сценариев](diagrams/component/WarmHouse_Component_Executor.png)
+
+#### Телеметрия
+
+![Компоненты: Телеметрия](diagrams/component/WarmHouse_Component_Telemetry.png)
+
+#### Видеонаблюдение
+
+![Компоненты: Видеонаблюдение](diagrams/component/WarmHouse_Component_Video.png)
+
+#### Уведомления
+
+![Компоненты: Уведомления](diagrams/component/WarmHouse_Component_Notifications.png)
 
 **Диаграмма кода (Code)**
 

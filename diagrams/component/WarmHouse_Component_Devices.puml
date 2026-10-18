@@ -1,0 +1,45 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Устройства дома — диаграмма компонентов
+
+Container(gateway, "API-шлюз", "Kong", "Единая точка входа")
+Container(consumers, "Сервисы-потребители", "TypeScript", "Команды и состояние, Конструктор, Исполнение, Телеметрия, Видеонаблюдение")
+Container(homes, "Управление домами", "TypeScript", "Дома, комнаты, права")
+Container(types, "Типы и протоколы", "TypeScript", "Каталог типов, сопряжение")
+ContainerDb(postgres, "PostgreSQL", "PostgreSQL", "Схема devices")
+ContainerQueue(kafka, "Kafka", "Kafka", "События между сервисами")
+
+Container_Boundary(devices, "Устройства дома") {
+  Component(publicApi, "Публичный контроллер", "TypeScript, REST", "Добавить, переименовать, перенести, удалить устройство")
+  Component(internalApi, "Внутренний контроллер", "TypeScript, REST", "Данные об устройстве и его комнате, только для сервисов")
+  Component(deviceService, "Сервис устройств", "TypeScript", "Переименование, перенос, удаление, чтение")
+  Component(connectService, "Сервис подключения", "TypeScript", "Проверка прав, сопряжение, создание записи")
+  Component(homesClient, "Клиент домов", "TypeScript, REST", "Проверка дома, комнаты и прав")
+  Component(typesClient, "Клиент типов и протоколов", "TypeScript, REST", "Запрос сопряжения")
+  Component(repository, "Репозиторий", "TypeScript", "Работа со схемой devices")
+  Component(producer, "Продюсер событий", "TypeScript, Kafka", "Публикует изменения устройств")
+}
+
+Rel(gateway, publicApi, "Передаёт запросы пользователя", "REST")
+Rel(consumers, internalApi, "Запрашивают устройство и комнату", "REST")
+
+Rel(publicApi, connectService, "Добавить устройство")
+Rel(publicApi, deviceService, "Переименовать, перенести, удалить")
+Rel(internalApi, deviceService, "Читает данные устройства")
+
+Rel(connectService, homesClient, "Проверяет дом, комнату и права")
+Rel(connectService, typesClient, "Сопрягает устройство")
+Rel(connectService, repository, "Создаёт запись об устройстве")
+Rel(connectService, producer, "Передаёт «устройство добавлено»")
+Rel(deviceService, homesClient, "Проверяет новую комнату и права")
+Rel(deviceService, repository, "Читает и меняет записи")
+Rel(deviceService, producer, "Передаёт «устройство удалено» и «перенесено»")
+
+Rel(homesClient, homes, "Проверяет дом, комнату и права", "REST")
+Rel(typesClient, types, "Сопрягает устройство", "REST")
+Rel(repository, postgres, "Читает и пишет", "SQL")
+Rel(producer, kafka, "Публикует «добавлено», «удалено», «перенесено»")
+
+SHOW_LEGEND()
+@enduml

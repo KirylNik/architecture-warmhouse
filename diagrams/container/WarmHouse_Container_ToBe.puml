@@ -10,7 +10,8 @@ Person(user, "Пользователь", "Житель дома")
 Person(support, "Сотрудник поддержки", "Сотрудник компании")
 
 System_Ext(idp, "Яндекс ID, Google", "Внешний вход")
-System_Ext(hub, "Хабы и устройства партнёров", "Датчики, реле, камеры, замки в доме")
+System_Ext(hub, "Модули управления и устройства партнёров", "Хаб из комплекта, устройства по Matter и Zigbee")
+System_Ext(legacy, "Установленные датчики и реле", "Модули отопления, подключённые к монолиту")
 System_Ext(push, "Push-сервисы", "Apple APNs, Google FCM")
 System_Ext(mail, "Почтовый сервис", "Отправка писем")
 
@@ -52,6 +53,7 @@ System_Boundary(warmhouse, "Тёплый дом") {
   ContainerDb(postgres, "PostgreSQL", "PostgreSQL", "Отдельная схема на каждый сервис")
   ContainerDb(clickhouse, "ClickHouse", "ClickHouse", "Показания датчиков")
   ContainerDb(s3, "Объектное хранилище", "S3", "Видеозаписи")
+  ContainerDb(redis, "Redis", "Redis", "Отложенные задачи планировщика сценариев")
 }
 
 Lay_R(user, support)
@@ -65,6 +67,7 @@ Lay_R(kafka, clickhouse)
 Lay_R(clickhouse, s3)
 Lay_R(s3, postgres)
 Lay_L(mqtt, hub)
+Lay_D(hub, legacy)
 Lay_R(keycloak, idp)
 Lay_R(notifications, push)
 
@@ -93,13 +96,18 @@ Rel_R(keycloak, idp, "Вход через", "OAuth 2.0")
 
 Rel_D(types, mqtt, "Обменивается сообщениями с хабами", "MQTT")
 Rel_R(hub, mqtt, "Обменивается сообщениями", "MQTT")
+Rel(types, legacy, "Опрашивает и отправляет команды", "HTTP")
 
-Rel_D(devicesDomain, kafka, "Публикует показания, состояние, команды")
+Rel_D(devicesDomain, kafka, "Публикует показания, состояние, команды, изменения устройств")
+Rel_U(kafka, devicesDomain, "Доставляет команды и состояние")
 Rel_D(automation, kafka, "Публикует команды и изменения сценариев")
-Rel_D(access, kafka, "Публикует приглашения и отзыв доступа")
+Rel_U(kafka, automation, "Доставляет показания, состояние, изменения устройств и сценариев")
+Rel_D(access, kafka, "Публикует приглашения, отзыв доступа, удаление аккаунта")
+Rel_U(kafka, access, "Доставляет «аккаунт удалён»")
 Rel_U(kafka, monitoring, "Доставляет показания и запросы уведомлений")
 
 Rel_D(telemetry, clickhouse, "Пишет и читает")
+Rel_D(executor, redis, "Хранит расписания сценариев", "BullMQ")
 Rel_D(video, s3, "Пишет и читает записи")
 Rel_R(notifications, push, "Отправляет push", "HTTPS")
 Rel_R(notifications, mail, "Отправляет письма", "SMTP")
