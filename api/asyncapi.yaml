@@ -1,0 +1,91 @@
+asyncapi: 3.0.0
+info:
+  title: Тёплый дом — события
+  version: 1.0.0
+  description: Асинхронные события между сервисами через Kafka.
+
+servers:
+  kafka:
+    host: kafka:9092
+    protocol: kafka
+
+channels:
+  deviceReadings:
+    address: device.readings
+    description: Показания устройств, переведённые адаптерами во внутреннюю модель. Ключ сообщения — deviceId, поэтому показания одного устройства читаются по порядку.
+    messages:
+      deviceReading:
+        $ref: '#/components/messages/DeviceReading'
+
+operations:
+  publishDeviceReading:
+    action: send
+    channel:
+      $ref: '#/channels/deviceReadings'
+    summary: «Типы и протоколы» публикуют показание устройства
+    messages:
+      - $ref: '#/channels/deviceReadings/messages/deviceReading'
+  receiveDeviceReading:
+    action: receive
+    channel:
+      $ref: '#/channels/deviceReadings'
+    summary: «Телеметрия» сохраняет показание, «Исполнение сценариев» проверяет триггеры
+    messages:
+      - $ref: '#/channels/deviceReadings/messages/deviceReading'
+
+components:
+  messages:
+    DeviceReading:
+      name: DeviceReading
+      title: Показание получено
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/DeviceEvent'
+      examples:
+        - name: temperature
+          summary: Датчик в спальне измерил 17,50 °C
+          payload:
+            id: ev-0000-4000-8000-000000000981
+            deviceId: 3f2a1b4c-0000-4000-8000-000000000012
+            capability: temperature
+            value: 1750
+            unit: centiCelsius
+            occurredAt: '2026-10-18T22:50:00Z'
+        - name: commandResult
+          summary: Котёл подтвердил включение по команде
+          payload:
+            id: ev-0000-4000-8000-000000000982
+            deviceId: 3f2a1b4c-0000-4000-8000-000000000007
+            capability: onOff
+            value: true
+            occurredAt: '2026-10-18T22:50:03Z'
+            correlationId: c0ffee00-0000-4000-8000-000000000017
+
+  schemas:
+    DeviceEvent:
+      type: object
+      required: [id, deviceId, capability, value, occurredAt]
+      properties:
+        id:
+          type: string
+          description: Уникальный ID сообщения, защищает от повторной обработки
+        deviceId:
+          type: string
+          format: uuid
+        capability:
+          type: string
+          description: Возможность устройства, например temperature или onOff
+        value:
+          oneOf:
+            - type: number
+            - type: boolean
+            - type: string
+        unit:
+          type: string
+          description: Единица значения, температура — centiCelsius (сотые доли градуса)
+        occurredAt:
+          type: string
+          format: date-time
+        correlationId:
+          type: string
+          description: ID команды, если событие — ответ на неё
