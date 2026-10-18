@@ -1,0 +1,39 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Уведомления — диаграмма компонентов
+
+Container(gateway, "API-шлюз", "Kong", "Единая точка входа")
+Container(accounts, "Управление аккаунтами", "TypeScript", "Профиль, контакты")
+ContainerDb(postgres, "PostgreSQL", "PostgreSQL", "Схема notifications")
+ContainerQueue(kafka, "Kafka", "Kafka", "События между сервисами")
+System_Ext(push, "Push-сервисы", "Apple APNs, Google FCM")
+System_Ext(mail, "Почтовый сервис", "Отправка писем")
+
+Container_Boundary(notifications, "Уведомления") {
+  Component(controller, "REST-контроллер", "TypeScript, REST", "Настройки каналов и история уведомлений")
+  Component(consumer, "Консьюмер событий", "TypeScript, Kafka", "Получает запросы уведомлений")
+  Component(notificationService, "Сервис уведомлений", "TypeScript", "Выбор каналов по настройкам, статусы отправки")
+  Component(pushSender, "Отправка push", "TypeScript, APNs, FCM", "Отправляет push на телефон")
+  Component(mailSender, "Отправка почты", "TypeScript, SMTP", "Отправляет письма")
+  Component(accountsClient, "Клиент аккаунтов", "TypeScript, REST", "Контакты получателя")
+  Component(repository, "Репозиторий", "TypeScript", "Настройки, история и статусы")
+}
+
+Rel(gateway, controller, "Передаёт запросы пользователя", "REST")
+Rel(kafka, consumer, "Доставляет запросы уведомлений")
+
+Rel(controller, notificationService, "Читает и меняет настройки, историю")
+Rel(consumer, notificationService, "Передаёт запрос уведомления")
+Rel(notificationService, accountsClient, "Запрашивает контакты")
+Rel(notificationService, pushSender, "Отправляет push")
+Rel(notificationService, mailSender, "Отправляет письмо")
+Rel(notificationService, repository, "Читает настройки, пишет статусы")
+
+Rel(accountsClient, accounts, "Запрашивает контакты", "REST")
+Rel(pushSender, push, "Отправляет push", "HTTPS")
+Rel(mailSender, mail, "Отправляет письма", "SMTP")
+Rel(repository, postgres, "Читает и пишет", "SQL")
+
+SHOW_LEGEND()
+@enduml

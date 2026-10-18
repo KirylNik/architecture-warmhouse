@@ -1,0 +1,36 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Отопление — диаграмма компонентов (шаблон сервисов категорий)
+
+Container(gateway, "API-шлюз", "Kong", "Единая точка входа")
+Container(devices, "Устройства дома", "TypeScript", "Экземпляры устройств")
+ContainerDb(postgres, "PostgreSQL", "PostgreSQL", "Схема heating")
+ContainerQueue(kafka, "Kafka", "Kafka", "События между сервисами")
+
+Container_Boundary(heating, "Отопление") {
+  Component(controller, "REST-контроллер", "TypeScript, REST", "Команды и состояние отопления для приложения")
+  Component(heatingService, "Сервис отопления", "TypeScript", "Обработка команд, учёт состояния, связь с устройством")
+  Component(rules, "Правила отопления", "TypeScript", "Уставка, режимы, защита от замерзания: не ниже +5 °C")
+  Component(devicesClient, "Клиент устройств", "TypeScript, REST", "Данные об устройстве и его комнате")
+  Component(repository, "Репозиторий", "TypeScript", "Работа со схемой heating")
+  Component(consumer, "Консьюмер событий", "TypeScript, Kafka", "Получает команды сценариев и состояние устройств")
+  Component(producer, "Продюсер событий", "TypeScript, Kafka", "Публикует команды для устройств, изменения состояния, запросы уведомлений")
+}
+
+Rel(gateway, controller, "Передаёт команды пользователя", "REST")
+
+Rel(controller, heatingService, "Передаёт команду или запрос состояния")
+Rel(consumer, heatingService, "Передаёт команды сценариев и состояние устройств")
+Rel(heatingService, rules, "Проверяет каждую команду")
+Rel(heatingService, devicesClient, "Запрашивает устройство")
+Rel(heatingService, repository, "Читает и пишет состояние")
+Rel(heatingService, producer, "Передаёт команды и события")
+
+Rel(devicesClient, devices, "Запрашивает устройство", "REST")
+Rel(repository, postgres, "Читает и пишет", "SQL")
+Rel(kafka, consumer, "Доставляет команды и состояние")
+Rel(producer, kafka, "Публикует команды, состояние, запросы уведомлений")
+
+SHOW_LEGEND()
+@enduml

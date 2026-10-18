@@ -1,0 +1,37 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Управление аккаунтами — диаграмма компонентов
+
+Container(gateway, "API-шлюз", "Kong", "Единая точка входа")
+Container(homes, "Управление домами", "TypeScript", "Дома, участники, права")
+Container(notifications, "Уведомления", "TypeScript", "Доставка сообщений")
+Container(keycloak, "Keycloak", "Keycloak", "Вход, токены")
+ContainerDb(postgres, "PostgreSQL", "PostgreSQL", "Схема accounts")
+ContainerQueue(kafka, "Kafka", "Kafka", "События между сервисами")
+
+Container_Boundary(accounts, "Управление аккаунтами") {
+  Component(publicApi, "Публичный контроллер", "TypeScript, REST", "Профиль текущего пользователя")
+  Component(internalApi, "Внутренний контроллер", "TypeScript, REST", "Поиск пользователя и контакты, только для сервисов")
+  Component(service, "Сервис аккаунтов", "TypeScript", "Профиль, согласия, удаление аккаунта")
+  Component(keycloakClient, "Клиент Keycloak", "TypeScript, Admin API", "Создание, изменение и удаление пользователей")
+  Component(repository, "Репозиторий", "TypeScript", "Работа со схемой accounts")
+  Component(producer, "Продюсер событий", "TypeScript, Kafka", "Публикует события аккаунтов")
+}
+
+Rel(gateway, publicApi, "Передаёт запросы пользователя", "REST")
+Rel(homes, internalApi, "Ищет пользователя по почте", "REST")
+Rel(notifications, internalApi, "Запрашивает контакты", "REST")
+
+Rel(publicApi, service, "Вызывает")
+Rel(internalApi, service, "Вызывает")
+Rel(service, keycloakClient, "Управляет пользователями")
+Rel(service, repository, "Читает и пишет профиль и согласия")
+Rel(service, producer, "Передаёт событие удаления аккаунта")
+
+Rel(keycloakClient, keycloak, "Вызывает", "Admin API, HTTPS")
+Rel(repository, postgres, "Читает и пишет", "SQL")
+Rel(producer, kafka, "Публикует «аккаунт удалён»")
+
+SHOW_LEGEND()
+@enduml

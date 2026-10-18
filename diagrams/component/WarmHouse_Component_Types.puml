@@ -1,0 +1,64 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Типы и протоколы — диаграмма компонентов
+
+Container(devices, "Устройства дома", "TypeScript", "Экземпляры устройств")
+Container(constructor, "Конструктор сценариев", "TypeScript", "Описание сценариев")
+Container(video, "Видеонаблюдение", "TypeScript", "Живой просмотр и архив")
+ContainerQueue(mqtt, "MQTT-брокер", "MQTT", "Связь с модулями управления")
+ContainerQueue(kafka, "Kafka", "Kafka", "События между сервисами")
+ContainerDb(postgres, "PostgreSQL", "PostgreSQL", "Схема types")
+System_Ext(legacy, "Установленные датчики и реле", "Модули отопления, подключённые к монолиту")
+
+Container_Boundary(types, "Типы и протоколы") {
+  Component(controller, "REST-контроллер", "TypeScript, REST", "Возможности типов, сопряжение, открытие видеопотока")
+  Component(catalog, "Сервис каталога типов", "TypeScript", "Типы устройств и их возможности")
+  Component(pairing, "Сервис сопряжения", "TypeScript", "Подключение нового устройства к модулю управления")
+  Component(router, "Маршрутизатор сообщений", "TypeScript", "Выбирает адаптер по устройству, связывает адаптеры и Kafka")
+
+  Component(matter, "Адаптер Matter", "TypeScript", "Перевод сообщений Matter во внутреннюю модель и обратно")
+  Component(zigbee, "Адаптер Zigbee", "TypeScript", "Перевод сообщений Zigbee во внутреннюю модель и обратно")
+  Component(legacyAdapter, "Адаптер старых модулей", "TypeScript, HTTP", "Опрос установленных датчиков и реле")
+
+  Component(mqttSubscriber, "MQTT-подписчик", "TypeScript, MQTT", "Получает сообщения модулей управления")
+  Component(mqttPublisher, "MQTT-публикатор", "TypeScript, MQTT", "Отправляет команды модулям управления")
+  Component(kafkaProducer, "Kafka-продюсер", "TypeScript, Kafka", "Публикует показания и состояние")
+  Component(kafkaConsumer, "Kafka-консьюмер", "TypeScript, Kafka", "Получает команды для устройств")
+  Component(repository, "Репозиторий", "TypeScript", "Каталог типов, привязка устройства к модулю и протоколу")
+}
+
+Rel(devices, controller, "Сопрягает устройство", "REST")
+Rel(constructor, controller, "Запрашивает возможности типов", "REST")
+Rel(video, controller, "Открывает видеопоток", "REST")
+
+Rel(controller, catalog, "Возможности типов")
+Rel(controller, pairing, "Сопряжение")
+Rel(controller, router, "Команда открыть видеопоток")
+
+Rel(pairing, catalog, "Определяет тип устройства")
+Rel(pairing, router, "Отправляет запрос сопряжения")
+Rel(pairing, repository, "Сохраняет привязку устройства")
+Rel(catalog, repository, "Читает и пишет каталог")
+Rel(router, repository, "Ищет протокол устройства")
+
+Rel(mqtt, mqttSubscriber, "Доставляет сообщения модулей", "MQTT")
+Rel(mqttSubscriber, router, "Передаёт сообщения модулей")
+Rel(router, matter, "Переводит сообщения Matter")
+Rel(router, zigbee, "Переводит сообщения Zigbee")
+Rel(router, legacyAdapter, "Передаёт команды старым модулям")
+Rel(legacyAdapter, router, "Передаёт показания старых модулей")
+Rel(matter, mqttPublisher, "Отправляет команды")
+Rel(zigbee, mqttPublisher, "Отправляет команды")
+Rel(mqttPublisher, mqtt, "Публикует команды", "MQTT")
+Rel(legacyAdapter, legacy, "Опрашивает и отправляет команды", "HTTP")
+
+Rel(router, kafkaProducer, "Передаёт показания и состояние")
+Rel(kafkaProducer, kafka, "Публикует показания и состояние")
+Rel(kafka, kafkaConsumer, "Доставляет команды для устройств")
+Rel(kafkaConsumer, router, "Передаёт команды")
+
+Rel(repository, postgres, "Читает и пишет", "SQL")
+
+SHOW_LEGEND()
+@enduml

@@ -1,0 +1,357 @@
+openapi: 3.0.3
+info:
+  title: Тёплый дом — REST API
+  version: 1.0.0
+  description: Синхронные запросы через API-шлюз к сервисам «Устройства дома» и «Отопление».
+servers:
+  - url: https://api.warmhouse.example/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Устройства дома
+    description: Реестр устройств и их подключение
+  - name: Отопление
+    description: Команды и состояние отопления
+
+paths:
+  /devices:
+    post:
+      operationId: createDevice
+      tags: [Устройства дома]
+      summary: Добавить устройство в дом
+      description: Проверяет права пользователя на дом, сопрягает устройство через «Типы и протоколы» и создаёт запись.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceCreate'
+            examples:
+              thermostat:
+                value:
+                  serialNumber: TH-2024-000731
+                  houseId: 5b1c2d3e-0000-4000-8000-000000000005
+                  roomId: 7a8b9c0d-0000-4000-8000-000000000003
+                  name: Термостат в спальне
+      responses:
+        '201':
+          description: Устройство добавлено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+              examples:
+                created:
+                  $ref: '#/components/examples/Device'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Устройство с таким серийным номером уже подключено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                duplicate:
+                  value:
+                    code: DEVICE_ALREADY_EXISTS
+                    message: Устройство TH-2024-000731 уже подключено
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /devices/{deviceId}:
+    get:
+      operationId: getDevice
+      tags: [Устройства дома]
+      summary: Получить информацию об устройстве
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      responses:
+        '200':
+          description: Устройство найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+              examples:
+                thermostat:
+                  $ref: '#/components/examples/Device'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /heating/{deviceId}/state:
+    get:
+      operationId: getHeatingState
+      tags: [Отопление]
+      summary: Получить состояние отопления
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      responses:
+        '200':
+          description: Текущее состояние
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeatingState'
+              examples:
+                heating:
+                  value:
+                    deviceId: 3f2a1b4c-0000-4000-8000-000000000042
+                    isOn: true
+                    setpoint: 2200
+                    unit: centiCelsius
+                    mode: comfort
+                    updatedAt: '2026-10-18T21:05:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /heating/{deviceId}/commands:
+    post:
+      operationId: sendHeatingCommand
+      tags: [Отопление]
+      summary: Отправить команду отоплению
+      description: Команда проверяется правилами отопления и отправляется устройству асинхронно. Результат приходит событием изменения состояния.
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HeatingCommand'
+            examples:
+              setTemperature:
+                value:
+                  action: setTemperature
+                  value: 2200
+                  unit: centiCelsius
+              turnOff:
+                value:
+                  action: turnOff
+      responses:
+        '202':
+          description: Команда принята и отправлена устройству
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandAccepted'
+              examples:
+                accepted:
+                  value:
+                    commandId: c0ffee00-0000-4000-8000-000000000017
+                    status: accepted
+        '400':
+          description: Команда нарушает правила отопления
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                tooLow:
+                  value:
+                    code: SETPOINT_OUT_OF_RANGE
+                    message: Уставка не может быть ниже 500 (5,00 °C)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    DeviceId:
+      name: deviceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    DeviceCreate:
+      type: object
+      required: [serialNumber, houseId]
+      properties:
+        serialNumber:
+          type: string
+        houseId:
+          type: string
+          format: uuid
+        roomId:
+          type: string
+          format: uuid
+        name:
+          type: string
+
+    Device:
+      type: object
+      required: [id, typeId, houseId, serialNumber]
+      properties:
+        id:
+          type: string
+          format: uuid
+        typeId:
+          type: string
+          format: uuid
+        houseId:
+          type: string
+          format: uuid
+        roomId:
+          type: string
+          format: uuid
+        serialNumber:
+          type: string
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    HeatingState:
+      type: object
+      required: [deviceId, isOn]
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+        isOn:
+          type: boolean
+        setpoint:
+          type: integer
+          minimum: 500
+          maximum: 3000
+          description: Уставка в сотых долях градуса, 2200 = 22,00 °C
+        unit:
+          type: string
+          enum: [centiCelsius]
+        mode:
+          type: string
+          enum: [comfort, eco, frostProtection]
+        updatedAt:
+          type: string
+          format: date-time
+
+    HeatingCommand:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [turnOn, turnOff, setTemperature, setMode]
+        value:
+          description: Для setTemperature — уставка в сотых долях градуса (500–3000), для setMode — режим
+          oneOf:
+            - type: integer
+            - type: string
+        unit:
+          type: string
+          enum: [centiCelsius]
+
+    CommandAccepted:
+      type: object
+      required: [commandId, status]
+      properties:
+        commandId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [accepted]
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+
+  examples:
+    Device:
+      value:
+        id: 3f2a1b4c-0000-4000-8000-000000000042
+        typeId: 9d8e7f6a-0000-4000-8000-000000000001
+        houseId: 5b1c2d3e-0000-4000-8000-000000000005
+        roomId: 7a8b9c0d-0000-4000-8000-000000000003
+        serialNumber: TH-2024-000731
+        name: Термостат в спальне
+        createdAt: '2026-10-18T20:00:00Z'
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            validation:
+              value:
+                code: VALIDATION_ERROR
+                message: Поле serialNumber обязательно
+    Unauthorized:
+      description: Нет или просрочен токен
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            noToken:
+              value:
+                code: UNAUTHORIZED
+                message: Требуется авторизация
+    Forbidden:
+      description: Нет прав на дом или устройство
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            noAccess:
+              value:
+                code: FORBIDDEN
+                message: Нет доступа к этому дому
+    NotFound:
+      description: Устройство не найдено
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            notFound:
+              value:
+                code: DEVICE_NOT_FOUND
+                message: Устройство не найдено
+    InternalError:
+      description: Внутренняя ошибка сервера
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            internal:
+              value:
+                code: INTERNAL_ERROR
+                message: Внутренняя ошибка сервера

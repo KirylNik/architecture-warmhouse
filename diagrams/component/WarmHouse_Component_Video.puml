@@ -1,0 +1,51 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Видеонаблюдение — диаграмма компонентов
+
+Container(mobile, "Мобильное приложение", "iOS, Android", "Приложение пользователя")
+Container(gateway, "API-шлюз", "Kong", "Единая точка входа")
+System_Ext(camera, "Камеры", "Через модуль управления")
+Container(devices, "Устройства дома", "TypeScript", "Экземпляры устройств")
+Container(types, "Типы и протоколы", "TypeScript", "Команды устройствам")
+ContainerDb(postgres, "PostgreSQL", "PostgreSQL", "Схема video")
+ContainerDb(s3, "Объектное хранилище", "S3", "Видеозаписи")
+ContainerQueue(kafka, "Kafka", "Kafka", "События между сервисами")
+
+Container_Boundary(video, "Видеонаблюдение") {
+  Component(controller, "REST-контроллер", "TypeScript, REST", "Камеры дома, открытие просмотра, архив записей")
+  Component(videoService, "Сервис видео", "TypeScript", "Сеансы просмотра, права, запись по движению")
+  Component(mediaServer, "Медиасервер", "MediaMTX, готовый продукт", "Приём потока камеры, раздача по WebRTC, запись сегментов")
+  Component(archiveService, "Сервис архива", "TypeScript", "Метаданные записей, выдача записей")
+  Component(cleanup, "Очистка архива", "TypeScript", "Удаляет записи старше срока хранения по расписанию")
+  Component(s3Client, "Клиент S3", "TypeScript, S3 API", "Загрузка и удаление записей")
+  Component(devicesClient, "Клиент устройств", "TypeScript, REST", "Камеры дома")
+  Component(typesClient, "Клиент типов и протоколов", "TypeScript, REST", "Команда камере начать трансляцию")
+  Component(repository, "Репозиторий", "TypeScript", "Метаданные записей и правила хранения")
+  Component(consumer, "Консьюмер событий", "TypeScript, Kafka", "Получает «движение замечено» и «камера удалена»")
+}
+
+Rel(gateway, controller, "Передаёт запросы пользователя", "REST")
+Rel(mobile, mediaServer, "Смотрит видео", "WebRTC")
+Rel(camera, mediaServer, "Передаёт видеопоток", "RTSP")
+Rel(kafka, consumer, "Доставляет движение и удаление камер")
+
+Rel(controller, videoService, "Открывает просмотр")
+Rel(controller, archiveService, "Запрашивает записи")
+Rel(consumer, videoService, "Включает запись по движению, отключает удалённую камеру")
+Rel(videoService, devicesClient, "Запрашивает камеры дома")
+Rel(videoService, typesClient, "Просит камеру начать трансляцию")
+Rel(videoService, mediaServer, "Создаёт сеансы просмотра и записи", "HTTP API")
+Rel(mediaServer, archiveService, "Передаёт готовые сегменты записи")
+Rel(archiveService, s3Client, "Загружает записи")
+Rel(archiveService, repository, "Пишет и читает метаданные")
+Rel(cleanup, repository, "Ищет устаревшие записи")
+Rel(cleanup, s3Client, "Удаляет устаревшие записи")
+
+Rel(devicesClient, devices, "Запрашивает камеры", "REST")
+Rel(typesClient, types, "Открывает видеопоток", "REST")
+Rel(s3Client, s3, "Пишет, читает и удаляет", "S3 API")
+Rel(repository, postgres, "Читает и пишет", "SQL")
+
+SHOW_LEGEND()
+@enduml

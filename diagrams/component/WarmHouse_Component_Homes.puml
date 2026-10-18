@@ -1,0 +1,44 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Управление домами — диаграмма компонентов
+
+Container(gateway, "API-шлюз", "Kong", "Единая точка входа")
+Container(devices, "Устройства дома", "TypeScript", "Экземпляры устройств")
+Container(accounts, "Управление аккаунтами", "TypeScript", "Профиль, контакты")
+ContainerDb(postgres, "PostgreSQL", "PostgreSQL", "Схема homes")
+ContainerQueue(kafka, "Kafka", "Kafka", "События между сервисами")
+
+Container_Boundary(homes, "Управление домами") {
+  Component(publicApi, "Публичный контроллер", "TypeScript, REST", "Дома, комнаты, участники, приглашения")
+  Component(internalApi, "Внутренний контроллер", "TypeScript, REST", "Проверка дома, комнаты и прав, только для сервисов")
+  Component(homeService, "Сервис домов", "TypeScript", "Дом, адрес, комнаты")
+  Component(accessService, "Сервис доступа", "TypeScript", "Участники, роли, приглашения, права, временный доступ поддержки")
+  Component(accountsClient, "Клиент аккаунтов", "TypeScript, REST", "Поиск пользователя по почте")
+  Component(repository, "Репозиторий", "TypeScript", "Работа со схемой homes")
+  Component(producer, "Продюсер событий", "TypeScript, Kafka", "Публикует приглашения и отзыв доступа")
+  Component(consumer, "Консьюмер событий", "TypeScript, Kafka", "Получает «аккаунт удалён»")
+}
+
+Rel(gateway, publicApi, "Передаёт запросы пользователя и поддержки", "REST")
+Rel(devices, internalApi, "Проверяет дом, комнату и права", "REST")
+
+Rel(publicApi, homeService, "Вызывает")
+Rel(publicApi, accessService, "Вызывает")
+Rel(internalApi, homeService, "Проверяет дом и комнату")
+Rel(internalApi, accessService, "Проверяет права")
+
+Rel(accessService, homeService, "Проверяет, что дом существует")
+Rel(accessService, accountsClient, "Ищет приглашённого пользователя")
+Rel(homeService, repository, "Читает и пишет дома и комнаты")
+Rel(accessService, repository, "Читает и пишет участников и права")
+Rel(accessService, producer, "Передаёт приглашения и отзыв доступа")
+Rel(consumer, accessService, "Удаляет участие удалённого аккаунта")
+
+Rel(accountsClient, accounts, "Ищет пользователя по почте", "REST")
+Rel(repository, postgres, "Читает и пишет", "SQL")
+Rel(producer, kafka, "Публикует приглашения и отзыв доступа")
+Rel(kafka, consumer, "Доставляет «аккаунт удалён»")
+
+SHOW_LEGEND()
+@enduml

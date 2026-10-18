@@ -1,0 +1,247 @@
+@startuml
+title Тёплый дом — ER-диаграмма
+
+hide circle
+skinparam linetype ortho
+
+package "Управление аккаунтами" {
+  entity Account {
+    * id : uuid <<PK>>
+    --
+    email : string
+    phone : string
+    first_name : string
+    last_name : string
+    birth_date : date
+    address : string
+    created_at : timestamp
+    updated_at : timestamp
+  }
+}
+
+package "Управление домами" {
+  entity House {
+    * id : uuid <<PK>>
+    --
+    name : string
+    address : string
+    timezone : string
+    created_at : timestamp
+    updated_at : timestamp
+  }
+
+  entity Room {
+    * id : uuid <<PK>>
+    --
+    * house_id : uuid <<FK>>
+    name : string
+    created_at : timestamp
+    updated_at : timestamp
+  }
+
+  entity HouseMember {
+    * house_id : uuid <<PK, FK>>
+    * account_id : uuid <<PK>>
+    --
+    role : string
+    access_expires_at : timestamp
+    created_at : timestamp
+    updated_at : timestamp
+  }
+}
+
+package "Типы и протоколы" {
+  entity DeviceType {
+    * id : uuid <<PK>>
+    --
+    name : string
+    manufacturer : string
+    category : string
+    created_at : timestamp
+    updated_at : timestamp
+  }
+
+  entity Module {
+    * id : uuid <<PK>>
+    --
+    * house_id : uuid
+    serial_number : string
+    last_seen_at : timestamp
+    created_at : timestamp
+    updated_at : timestamp
+  }
+
+  entity DeviceBinding {
+    * device_id : uuid <<PK>>
+    --
+    * module_id : uuid <<FK>>
+    protocol : string
+    last_seen_at : timestamp
+    created_at : timestamp
+    updated_at : timestamp
+  }
+}
+
+package "Устройства дома" {
+  entity Device {
+    * id : uuid <<PK>>
+    --
+    * type_id : uuid
+    * house_id : uuid
+    room_id : uuid
+    serial_number : string
+    name : string
+    created_at : timestamp
+    updated_at : timestamp
+  }
+}
+
+package "Сервисы категорий" {
+  entity HeatingState {
+    * device_id : uuid <<PK>>
+    --
+    is_on : boolean
+    setpoint : number
+    mode : string
+    created_at : timestamp
+    updated_at : timestamp
+  }
+
+  entity LightingState {
+    * device_id : uuid <<PK>>
+    --
+    is_on : boolean
+    brightness : number
+    color : string
+    created_at : timestamp
+    updated_at : timestamp
+  }
+
+  entity GateState {
+    * device_id : uuid <<PK>>
+    --
+    is_locked : boolean
+    position : string
+    created_at : timestamp
+    updated_at : timestamp
+  }
+
+  entity GateEvent {
+    * id : uuid <<PK>>
+    --
+    * device_id : uuid <<FK>>
+    account_id : uuid
+    action : string
+    source : string
+    occurred_at : timestamp
+  }
+
+  entity SensorState {
+    * device_id : uuid <<PK>>
+    --
+    battery_level : number
+    report_interval : number
+    created_at : timestamp
+    updated_at : timestamp
+  }
+}
+
+package "Конструктор сценариев" {
+  entity Scenario {
+    * id : uuid <<PK>>
+    --
+    * house_id : uuid
+    * author_id : uuid
+    name : string
+    trigger : jsonb
+    conditions : jsonb
+    actions : jsonb
+    is_enabled : boolean
+    created_at : timestamp
+    updated_at : timestamp
+  }
+}
+
+package "Исполнение сценариев" {
+  entity ScenarioRun {
+    * id : uuid <<PK>>
+    --
+    * scenario_id : uuid
+    started_at : timestamp
+    finished_at : timestamp
+    result : string
+    error : string
+  }
+}
+
+package "Телеметрия" {
+  entity TelemetryData {
+    * device_id : uuid <<PK>>
+    * capability : string <<PK>>
+    * measured_at : timestamp <<PK>>
+    --
+    value : number
+    unit : string
+  }
+}
+
+package "Видеонаблюдение" {
+  entity Recording {
+    * id : uuid <<PK>>
+    --
+    * device_id : uuid
+    started_at : timestamp
+    ended_at : timestamp
+    storage_path : string
+    expires_at : timestamp
+    created_at : timestamp
+    updated_at : timestamp
+  }
+}
+
+package "Уведомления" {
+  entity Notification {
+    * id : uuid <<PK>>
+    --
+    * account_id : uuid
+    channel : string
+    title : string
+    body : string
+    status : string
+    created_at : timestamp
+    updated_at : timestamp
+  }
+}
+
+House ||--o{ Room
+House ||--o{ HouseMember
+Module ||--o{ DeviceBinding
+GateState ||--o{ GateEvent
+
+Account ||..o{ HouseMember
+House ||..o{ Device
+Room |o..o{ Device
+DeviceType ||..o{ Device
+House ||..o{ Module
+Device ||..o| DeviceBinding
+Device ||..o| HeatingState
+Device ||..o| LightingState
+Device ||..o| GateState
+Device ||..o| SensorState
+Account |o..o{ GateEvent
+House ||..o{ Scenario
+Account ||..o{ Scenario
+Scenario ||..o{ ScenarioRun
+Device ||..o{ TelemetryData
+Device ||..o{ Recording
+Account ||..o{ Notification
+
+legend right
+  PK — первичный ключ, FK — внешний ключ внутри сервиса
+  Сплошная линия — связь внутри сервиса (внешний ключ в базе)
+  Пунктир — ссылка на другой сервис (без внешнего ключа)
+  * — обязательное поле
+  Account и House — многие ко многим через HouseMember
+  Статус устройства (вкл/выкл) хранится в состоянии сервиса категории
+endlegend
+@enduml

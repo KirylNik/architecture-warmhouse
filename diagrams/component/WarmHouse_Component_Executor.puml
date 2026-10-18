@@ -1,0 +1,39 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Исполнение сценариев — диаграмма компонентов
+
+Container(gateway, "API-шлюз", "Kong", "Единая точка входа")
+Container(devices, "Устройства дома", "TypeScript", "Экземпляры устройств")
+ContainerDb(postgres, "PostgreSQL", "PostgreSQL", "Схема executor")
+ContainerDb(redis, "Redis", "Redis", "Отложенные задачи планировщика")
+ContainerQueue(kafka, "Kafka", "Kafka", "События между сервисами")
+
+Container_Boundary(executor, "Исполнение сценариев") {
+  Component(controller, "REST-контроллер", "TypeScript, REST", "История запусков для пользователя")
+  Component(consumer, "Консьюмер событий", "TypeScript, Kafka", "Показания, состояние, изменения сценариев и устройств, отзыв доступа")
+  Component(executionService, "Сервис исполнения", "TypeScript", "Срабатывание триггеров, проверка условий, разрешение конфликтов")
+  Component(scheduler, "Планировщик", "TypeScript, BullMQ", "Триггеры по времени, восстановление расписаний при старте")
+  Component(devicesClient, "Клиент устройств", "TypeScript, REST", "Устройства в комнате")
+  Component(repository, "Репозиторий", "TypeScript", "Копия сценариев, промежуточное состояние, история запусков")
+  Component(producer, "Продюсер событий", "TypeScript, Kafka", "Команды и запросы уведомлений")
+}
+
+Rel(gateway, controller, "Передаёт запросы истории", "REST")
+Rel(kafka, consumer, "Доставляет события")
+
+Rel(controller, executionService, "Запрашивает историю")
+Rel(consumer, executionService, "Передаёт события и изменения сценариев")
+Rel(executionService, scheduler, "Ставит и снимает задачи по расписанию")
+Rel(scheduler, executionService, "Запускает сценарий по времени")
+Rel(executionService, devicesClient, "Запрашивает устройства комнаты")
+Rel(executionService, repository, "Читает сценарии, пишет состояние и историю")
+Rel(executionService, producer, "Передаёт команды и запросы уведомлений")
+
+Rel(scheduler, redis, "Хранит отложенные задачи", "BullMQ")
+Rel(devicesClient, devices, "Запрашивает устройства", "REST")
+Rel(repository, postgres, "Читает и пишет", "SQL")
+Rel(producer, kafka, "Публикует команды и запросы уведомлений")
+
+SHOW_LEGEND()
+@enduml

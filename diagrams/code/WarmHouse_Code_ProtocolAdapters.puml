@@ -1,0 +1,81 @@
+@startuml
+title Типы и протоколы — диаграмма кода: адаптеры протоколов
+
+skinparam classAttributeIconSize 0
+hide empty members
+
+class RawMessage {
+  topic: string
+  payload: Buffer
+  receivedAt: Date
+}
+
+class DeviceEvent {
+  id: string
+  deviceId: string
+  capability: string
+  value: number | boolean | string
+  unit?: string
+  occurredAt: Date
+  correlationId?: string
+}
+
+class DeviceCommand {
+  id: string
+  deviceId: string
+  capability: string
+  action: string
+  value?: number | boolean | string
+  unit?: string
+  issuedAt: Date
+}
+
+interface ProtocolAdapter {
+  protocol: string
+  decode(raw: RawMessage): DeviceEvent[]
+  encode(command: DeviceCommand): RawMessage
+}
+
+class MatterAdapter {
+  protocol = "matter"
+}
+
+class ZigbeeAdapter {
+  protocol = "zigbee"
+}
+
+class AdapterRegistry {
+  register(adapter: ProtocolAdapter): void
+  get(protocol: string): ProtocolAdapter
+}
+
+class MessageRouter {
+  routeIncoming(raw: RawMessage): void
+  routeCommand(command: DeviceCommand): void
+}
+
+class DeviceBindingRepository {
+  findProtocol(deviceId: string): string
+}
+
+class MqttPublisher {
+  publish(raw: RawMessage): void
+}
+
+class KafkaProducer {
+  publish(event: DeviceEvent): void
+}
+
+MatterAdapter ..|> ProtocolAdapter
+ZigbeeAdapter ..|> ProtocolAdapter
+
+AdapterRegistry o-- "*" ProtocolAdapter : хранит по протоколу
+MessageRouter --> AdapterRegistry : находит адаптер
+MessageRouter --> DeviceBindingRepository : узнаёт протокол устройства
+MessageRouter --> MqttPublisher : отправляет команды
+MessageRouter --> KafkaProducer : публикует события
+
+ProtocolAdapter ..> RawMessage
+ProtocolAdapter ..> DeviceEvent
+ProtocolAdapter ..> DeviceCommand
+@enduml

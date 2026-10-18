@@ -1,0 +1,33 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Телеметрия — диаграмма компонентов
+
+Container(gateway, "API-шлюз", "Kong", "Единая точка входа")
+Container(devices, "Устройства дома", "TypeScript", "Экземпляры устройств")
+ContainerDb(clickhouse, "ClickHouse", "ClickHouse", "Показания датчиков")
+ContainerQueue(kafka, "Kafka", "Kafka", "События между сервисами")
+
+Container_Boundary(telemetry, "Телеметрия") {
+  Component(controller, "REST-контроллер", "TypeScript, REST", "Текущие показания и графики за период")
+  Component(telemetryService, "Сервис телеметрии", "TypeScript", "Выборка показаний по устройству и комнате")
+  Component(consumer, "Консьюмер событий", "TypeScript, Kafka", "Получает показания устройств")
+  Component(batchWriter, "Пакетная запись", "TypeScript", "Копит показания и пишет пачкой: раз в секунду или по 1000 строк")
+  Component(devicesClient, "Клиент устройств", "TypeScript, REST", "Устройства комнаты, только при чтении")
+  Component(repository, "Репозиторий", "TypeScript", "Запись и выборка в ClickHouse")
+}
+
+Rel(gateway, controller, "Передаёт запросы показаний", "REST")
+Rel(kafka, consumer, "Доставляет показания")
+
+Rel(consumer, batchWriter, "Передаёт показания")
+Rel(batchWriter, repository, "Пишет пачку показаний")
+Rel(controller, telemetryService, "Запрашивает показания")
+Rel(telemetryService, devicesClient, "Запрашивает устройства комнаты")
+Rel(telemetryService, repository, "Читает показания")
+
+Rel(devicesClient, devices, "Запрашивает устройства", "REST")
+Rel(repository, clickhouse, "Пишет пачками и читает", "SQL")
+
+SHOW_LEGEND()
+@enduml
